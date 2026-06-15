@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Katrol Nilai SMP - Admin & Super Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <style>
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; top: 0; left: 0; width: 100%; }
+            .no-print { display: none !important; }
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border: 1px solid black; padding: 5px; }
+        }
+        .table-wrapper { overflow-x: auto; }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+<!-- LOGIN -->
+<div id="loginContainer" class="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-600 to-indigo-700">
+    <div class="bg-white p-8 rounded-xl shadow-2xl w-96">
+        <div class="text-center mb-6">
+            <i class="fas fa-chalkboard-teacher text-5xl text-indigo-600"></i>
+            <h2 class="text-3xl font-bold">Katrol Nilai SMP</h2>
+            <p class="text-gray-500">Sistem Penilaian Terpadu</p>
+        </div>
+        <div>
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">Login Sebagai</label>
+                <select id="loginRole" class="w-full border rounded-lg px-3 py-2">
+                    <option value="superadmin">Super Admin</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <div id="superadminLoginDiv">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Password Super Admin</label>
+                    <input type="password" id="superadminPassword" class="w-full px-4 py-2 border rounded-lg">
+                </div>
+            </div>
+            <div id="adminLoginDiv" class="hidden">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Pilih Admin</label>
+                    <select id="adminNameSelect" class="w-full border rounded-lg px-3 py-2">
+                        <option value="">-- Pilih Admin --</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Password Admin</label>
+                    <input type="password" id="adminPassword" class="w-full px-4 py-2 border rounded-lg">
+                </div>
+            </div>
+            <button id="loginBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg">MASUK</button>
+            <div id="loginError" class="text-red-500 text-sm mt-3 text-center hidden"></div>
+        </div>
+    </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appContainer" class="hidden min-h-screen bg-gray-100">
+    <nav class="bg-white shadow-md px-6 py-3 flex flex-wrap justify-between items-center no-print">
+        <div class="flex items-center space-x-2">
+            <i class="fas fa-chart-line text-2xl text-indigo-600"></i>
+            <span class="font-bold text-xl">Katrol Nilai SMP</span>
+            <span id="roleBadge" class="text-sm px-2 py-1 rounded-full ml-2"></span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div id="superadminButtons" class="flex space-x-2">
+                <button id="btnManageAdmins" class="bg-pink-500 hover:bg-pink-600 text-white px-3 py-1 rounded-lg text-sm"><i class="fas fa-users-cog"></i> Kelola Admin</button>
+                <button id="btnResetAll" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-sm"><i class="fas fa-trash-alt"></i> Reset Data</button>
+            </div>
+            <div id="adminButtons" class="flex space-x-2">
+                <button id="btnManageSubjects" class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded-lg text-sm"><i class="fas fa-book"></i> Kelola Mapel</button>
+                <button id="btnManageComponents" class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded-lg text-sm"><i class="fas fa-tasks"></i> Kelola Komponen</button>
+                <button id="btnBackup" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-lg text-sm"><i class="fas fa-download"></i> Backup</button>
+            </div>
+            <button id="logoutBtn" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 rounded-lg text-sm"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </div>
+    </nav>
+    <div class="container mx-auto px-4 py-6">
+        <div class="bg-white rounded-xl shadow-md p-5 mb-6 no-print">
+            <div class="flex flex-wrap items-end gap-4">
+                <div><label class="block text-sm font-semibold">Tingkat</label><select id="selectTingkat" class="mt-1 border rounded-lg px-3 py-2"><option value="7">7</option><option value="8">8</option><option value="9">9</option></select></div>
+                <div><label class="block text-sm font-semibold">Kelas Huruf</label><select id="selectHuruf" class="mt-1 border rounded-lg px-3 py-2"></select></div>
+                <div><label class="block text-sm font-semibold">Mapel</label><select id="filterMapel" class="mt-1 border rounded-lg px-3 py-2"><option value="all">Semua Mapel</option></select></div>
+                <div><button id="btnCetakKelas" class="bg-blue-600 text-white px-5 py-2 rounded-lg"><i class="fas fa-print"></i> Cetak PDF</button></div>
+                <div><button id="btnTambahSiswa" class="bg-green-600 text-white px-5 py-2 rounded-lg"><i class="fas fa-user-plus"></i> Tambah Siswa</button></div>
+                <div><label class="block text-sm font-semibold">Import Excel</label><input type="file" id="importExcel" accept=".xlsx, .xls" class="text-sm border rounded-lg px-2 py-1"></div>
+                <div id="restoreDiv" class="hidden"><label class="block text-sm font-semibold">Restore Data</label><input type="file" id="restoreFile" accept=".json" class="text-sm border rounded-lg px-2 py-1"></div>
+            </div>
+            <div class="mt-3 text-sm text-gray-500"><i class="fas fa-info-circle"></i> Excel: kolom A=NIS, kolom B=Nama. Nilai langsung edit. Rata-rata otomatis.</div>
+            <div id="superAdminInfo" class="mt-2 text-sm text-indigo-600 hidden"><strong>Super Admin:</strong> Kelola admin, reset, restore, hapus mapel, hapus komponen.</div>
+            <div id="adminInfo" class="mt-2 text-sm text-green-600 hidden"><strong>Admin:</strong> Kelola mapel (tambah/edit, tidak hapus), kelola komponen (tambah/edit, tidak hapus), backup, nilai, siswa, cetak PDF.</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-md p-4">
+            <h3 id="kelasTitle" class="text-xl font-bold mb-3 border-b pb-2">Kelas 7A</h3>
+            <div class="table-wrapper"><table id="nilaiTable" class="min-w-full border text-sm"><thead><tr id="tableHeaderRow"></tr></thead><tbody id="tableBody"></tbody></table></div>
+            <div id="emptyMessage" class="hidden text-center py-8 text-gray-400">Belum ada data.</div>
+        </div>
+    </div>
+</div>
+
+<!-- MODALS -->
+<div id="siswaModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden"><div class="bg-white rounded-xl w-full max-w-md p-6"><div class="flex justify-between"><h3 id="modalTitle">Tambah/Edit Siswa</h3><button class="closeModalBtn">X</button></div><form id="siswaForm"><input type="hidden" id="editSiswaId"><input type="text" id="siswaNis" placeholder="NIS" class="w-full border p-2 my-2" required><input type="text" id="siswaNama" placeholder="Nama" class="w-full border p-2 my-2" required><div class="flex justify-end"><button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded">Simpan</button></div></form></div></div>
+<div id="mapelModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden"><div class="bg-white rounded-xl w-full max-w-md p-6"><div class="flex justify-between"><h3>Mata Pelajaran</h3><button class="closeMapelModal">X</button></div><div id="mapelList"></div><div class="flex mt-2"><input id="newMapelNama" class="border p-2 flex-1" placeholder="Nama Mapel Baru"><button id="addMapelBtn" class="bg-green-600 text-white px-3">Tambah</button></div><button id="saveMapelBtn" class="mt-3 bg-indigo-600 text-white px-4 py-1 rounded">Simpan</button></div></div>
+<div id="komponenModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden"><div class="bg-white rounded-xl w-full max-w-2xl p-6 max-h-[80vh] overflow-auto"><div class="flex justify-between"><h3>Komponen Penilaian (Bab / LK)</h3><button class="closeKomponenModal">X</button></div><div id="komponenList"></div><div class="flex mt-2 gap-2 flex-wrap"><input id="newKomponenNama" placeholder="Nama Komponen (contoh: Bab 1 - LK 1)" class="border p-2 flex-1"><select id="newKomponenMapel" class="border p-2"></select><button id="addKomponenBtn" class="bg-green-600 text-white px-3">Tambah</button></div><button id="saveKomponenBtn" class="mt-3 bg-indigo-600 text-white px-4 py-1 rounded">Simpan</button></div></div>
+<div id="adminModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden"><div class="bg-white rounded-xl w-full max-w-lg p-6"><div class="flex justify-between"><h3>Kelola Akun Admin</h3><button class="closeAdminModal">X</button></div><div id="adminList"></div><div class="flex mt-2 gap-2"><input id="newAdminName" placeholder="Nama Admin" class="border p-2 flex-1"><input id="newAdminPass" placeholder="Password" class="border p-2 flex-1"><button id="addAdminBtn" class="bg-green-600 text-white px-3">Tambah</button></div><button id="closeAdminModalBtn" class="mt-3 bg-indigo-600 text-white px-4 py-1 rounded">Tutup</button></div></div>
+
+<script>
+    // ---------- GLOBAL ----------
+    let currentRole = null;          // 'superadmin' atau 'admin'
+    let currentAdminName = null;
+    const SUPERADMIN_PASS = "hudasukses";
+    let approvedAdmins = [];          // [{id, name, password}]
+    let mataPelajaran = [];
+    let komponenPenilaian = [];
+    let siswaPerKelas = {};
+    const semuaKelas = [];
+    for (let t of [7,8,9]) for (let h of ['A','B','C','D','E','F','G','H','I']) semuaKelas.push(`${t}${h}`);
+    let currentTingkat = "7", currentHuruf = "A", currentKelas = "7A", currentFilterMapel = "all";
+
+    const STORAGE_SISWA = "KatrolSiswa";
+    const STORAGE_KOMP = "KatrolKomponen";
+    const STORAGE_MAPEL = "KatrolMapel";
+    const STORAGE_ADMINS = "KatrolAdmins";
+
+    function saveAll() {
+        localStorage.setItem(STORAGE_SISWA, JSON.stringify(siswaPerKelas));
+        localStorage.setItem(STORAGE_KOMP, JSON.stringify(komponenPenilaian));
+        localStorage.setItem(STORAGE_MAPEL, JSON.stringify(mataPelajaran));
+        localStorage.setItem(STORAGE_ADMINS, JSON.stringify(approvedAdmins));
+    }
+
+    function loadAll() {
+        siswaPerKelas = JSON.parse(localStorage.getItem(STORAGE_SISWA) || "{}");
+        komponenPenilaian = JSON.parse(localStorage.getItem(STORAGE_KOMP) || '[{"id":"komp1","nama":"Bab 1 - LK 1","mapelId":"mapel1"},{"id":"komp2","nama":"Bab 1 - LK 2","mapelId":"mapel1"},{"id":"komp3","nama":"Bab 2 - LK 1","mapelId":"mapel1"},{"id":"komp4","nama":"Bab 1 - LK 1","mapelId":"mapel2"}]');
+        mataPelajaran = JSON.parse(localStorage.getItem(STORAGE_MAPEL) || '[{"id":"mapel1","nama":"Matematika"},{"id":"mapel2","nama":"IPA"}]');
+        approvedAdmins = JSON.parse(localStorage.getItem(STORAGE_ADMINS) || '[{"id":"admin1","name":"Guru Matematika","password":"matematika123"},{"id":"admin2","name":"Guru IPA","password":"ipa123"}]');
+        for (let k of semuaKelas) if (!siswaPerKelas[k]) siswaPerKelas[k] = [];
+        saveAll();
+    }
+
+    function getSiswaList() { return siswaPerKelas[currentKelas] || []; }
+    function saveSiswaList(list) { siswaPerKelas[currentKelas] = list; saveAll(); }
+
+    function tambahSiswa(nis, nama) {
+        let list = getSiswaList();
+        let newId = Date.now()+Math.random();
+        let nilai = {};
+        komponenPenilaian.forEach(k=>nilai[k.id]=null);
+        list.push({id:newId, nis:nis.trim(), nama:nama.trim(), nilai});
+        saveSiswaList(list);
+    }
+    function editSiswa(id, nis, nama) { let list=getSiswaList(); let s=list.find(s=>s.id==id); if(s){s.nis=nis.trim(); s.nama=nama.trim(); saveSiswaList(list);} }
+    function hapusSiswa(id) { saveSiswaList(getSiswaList().filter(s=>s.id!=id)); }
+    function updateNilai(siswaId, kompId, val) { let list=getSiswaList(); let s=list.find(s=>s.id==siswaId); if(s){ let n=val===""?null:parseInt(val); if(isNaN(n)) n=null; if(n!==null && n<0) n=0; if(n!==null && n>100) n=100; s.nilai[kompId]=n; saveSiswaList(list);} }
+
+    function hitungRata(siswa, daftarKomp) { let arr = daftarKomp.map(k=>siswa.nilai[k.id]).filter(v=>v!==null); if(arr.length===0) return null; return Math.round(arr.reduce((a,b)=>a+b,0)/arr.length); }
+
+    function renderTabel() {
+        let siswaList = getSiswaList();
+        let kompList = currentFilterMapel==="all" ? komponenPenilaian : komponenPenilaian.filter(k=>k.mapelId===currentFilterMapel);
+        let thead = document.getElementById("tableHeaderRow");
+        let tbody = document.getElementById("tableBody");
+        let empty = document.getElementById("emptyMessage");
+        if(!siswaList.length || !kompList.length) { empty.classList.remove("hidden"); thead.innerHTML=""; tbody.innerHTML=""; return; }
+        empty.classList.add("hidden");
+        let header = `<th class="border p-1">No</th><th class="border p-1">Nama</th>`;
+        kompList.forEach(k=>header+=`<th class="border p-1">${escapeHtml(k.nama)}</th>`);
+        header+=`<th class="border p-1">Rata</th><th class="border p-1">Aksi</th>`;
+        thead.innerHTML=header;
+        let html="";
+        siswaList.forEach((sis,idx)=>{
+            let rata = hitungRata(sis, kompList);
+            html+=`<tr>`;
+            html+=`<td class="border p-1 text-center">${idx+1}</td><td class="border p-1">${escapeHtml(sis.nama)}</td>`;
+            kompList.forEach(k=>{
+                let val = sis.nilai[k.id]!==undefined ? sis.nilai[k.id] : '';
+                html+=`<td class="border p-1"><input type="number" class="nilai-input w-20 border rounded text-center" data-siswa="${sis.id}" data-komp="${k.id}" value="${val!==null?val:''}" min="0" max="100"></td>`;
+            });
+            html+=`<td class="border p-1 font-bold text-center">${rata!==null?rata:'-'}</td>`;
+            html+=`<td class="border p-1 text-center"><button class="edit-siswa text-blue-600" data-id="${sis.id}"><i class="fas fa-edit"></i></button> <button class="hapus-siswa text-red-600" data-id="${sis.id}"><i class="fas fa-trash"></i></button></td>`;
+            html+=`</tr>`;
+        });
+        tbody.innerHTML=html;
+        document.querySelectorAll('.nilai-input').forEach(inp=>inp.addEventListener('change',(e)=>{updateNilai(inp.dataset.siswa, inp.dataset.komp, inp.value); renderTabel();}));
+        document.querySelectorAll('.edit-siswa').forEach(btn=>btn.addEventListener('click',()=>{let id=btn.dataset.id; let s=getSiswaList().find(s=>s.id==id); if(s){document.getElementById("editSiswaId").value=id; document.getElementById("siswaNis").value=s.nis; document.getElementById("siswaNama").value=s.nama; document.getElementById("modalTitle").innerHTML="Edit Siswa"; document.getElementById("siswaModal").classList.remove("hidden");}}));
+        document.querySelectorAll('.hapus-siswa').forEach(btn=>btn.addEventListener('click',()=>{if(confirm("Hapus siswa?")){hapusSiswa(btn.dataset.id); renderTabel();}}));
+    }
+
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+    
+    function cetakKelas() {
+        let siswaList = getSiswaList();
+        let kompList = currentFilterMapel==="all" ? komponenPenilaian : komponenPenilaian.filter(k=>k.mapelId===currentFilterMapel);
+        if(!siswaList.length || !kompList.length) { alert("Tidak ada data untuk dicetak."); return; }
+        let printDiv = document.createElement('div');
+        printDiv.id = "print-area";
+        printDiv.innerHTML = `<h2 style="text-align:center">LAPORAN NILAI - KELAS ${currentKelas}</h2><table border="1" cellpadding="5"><thead><tr><th>No</th><th>Nama</th>${kompList.map(k=>`<th>${escapeHtml(k.nama)}</th>`).join('')}<th>Rata-rata</th></tr></thead><tbody>${siswaList.map((sis,idx)=>`<tr><td>${idx+1}</td><td>${escapeHtml(sis.nama)}<td>${kompList.map(k=>`<td>${sis.nilai[k.id]!==null?sis.nilai[k.id]:'-'}</td>`).join('')}<td>${hitungRata(sis,kompList)!==null?hitungRata(sis,kompList):'-'}</td></tr>`).join('')}</tbody></table>`;
+        document.body.appendChild(printDiv);
+        window.print();
+        setTimeout(()=>document.body.removeChild(printDiv),100);
+    }
+
+    // ---------- KELOLA MAPEL (Admin: tanpa tombol hapus) ----------
+    function renderMapelModal() {
+        let container = document.getElementById("mapelList");
+        container.innerHTML = "";
+        let isSuper = (currentRole === 'superadmin');
+        mataPelajaran.forEach(map => {
+            let div = document.createElement("div");
+            div.className = "flex gap-2 mb-2 items-center";
+            div.innerHTML = `<input class="mapel-nama border p-1 flex-1" value="${escapeHtml(map.nama)}" data-id="${map.id}">`;
+            if (isSuper) {
+                div.innerHTML += `<button class="hapus-mapel text-red-500" data-id="${map.id}"><i class="fas fa-trash"></i></button>`;
+            }
+            container.appendChild(div);
+        });
+        if (isSuper) {
+            document.querySelectorAll(".hapus-mapel").forEach(btn=>btn.addEventListener("click",()=>{let id=btn.dataset.id; mataPelajaran=mataPelajaran.filter(m=>m.id!=id); komponenPenilaian=komponenPenilaian.filter(k=>k.mapelId!=id); renderMapelModal(); updateDropdown(); saveAll();}));
+        }
+        document.querySelectorAll(".mapel-nama").forEach(inp=>inp.addEventListener("change",()=>{let id=inp.dataset.id; let m=mataPelajaran.find(m=>m.id==id); if(m) m.nama=inp.value.trim(); saveAll(); updateDropdown();}));
+    }
+    function tambahMapel() { let nama=document.getElementById("newMapelNama").value.trim(); if(!nama) return; mataPelajaran.push({id:"mapel_"+Date.now(), nama}); document.getElementById("newMapelNama").value=""; renderMapelModal(); updateDropdown(); saveAll(); }
+    function simpanMapel() { document.getElementById("mapelModal").classList.add("hidden"); updateDropdown(); renderTabel(); alert("Mapel disimpan"); }
+
+    // ---------- KELOLA KOMPONEN (Admin: bisa tambah & edit, tapi TIDAK bisa hapus) ----------
+    function renderKomponenModal() {
+        let container = document.getElementById("komponenList");
+        container.innerHTML = "";
+        let isSuper = (currentRole === 'superadmin');
+        komponenPenilaian.forEach((kom, idx) => {
+            let div = document.createElement("div");
+            div.className = "flex gap-2 mb-2 flex-wrap items-center";
+            let html = `<input class="komp-nama border p-1 flex-1" value="${escapeHtml(kom.nama)}" data-id="${kom.id}">
+                        <select class="komp-mapel border p-1" data-id="${kom.id}">
+                            ${mataPelajaran.map(m=>`<option value="${m.id}" ${kom.mapelId===m.id?'selected':''}>${escapeHtml(m.nama)}</option>`).join('')}
+                        </select>`;
+            if (isSuper) {
+                html += `<button class="hapus-komp text-red-500" data-id="${kom.id}"><i class="fas fa-trash"></i></button>`;
+            }
+            html += `<button class="up-komp text-gray-600" data-idx="${idx}"><i class="fas fa-arrow-up"></i></button>
+                     <button class="down-komp text-gray-600" data-idx="${idx}"><i class="fas fa-arrow-down"></i></button>`;
+            div.innerHTML = html;
+            container.appendChild(div);
+        });
+        attachKompEvents(isSuper);
+    }
+    function attachKompEvents(isSuper) {
+        // Hanya jika super admin, pasang event hapus
+        if (isSuper) {
+            document.querySelectorAll(".hapus-komp").forEach(btn=>btn.addEventListener("click",()=>{
+                komponenPenilaian = komponenPenilaian.filter(k=>k.id!=btn.dataset.id);
+                renderKomponenModal();
+                saveAll();
+                renderTabel();
+            }));
+        }
+        // Edit nama komponen
+        document.querySelectorAll(".komp-nama").forEach(inp=>inp.addEventListener("change",()=>{
+            let k = komponenPenilaian.find(k=>k.id==inp.dataset.id);
+            if(k) k.nama = inp.value.trim();
+            saveAll();
+            renderTabel();
+        }));
+        // Ganti mapel komponen
+        document.querySelectorAll(".komp-mapel").forEach(sel=>sel.addEventListener("change",()=>{
+            let k = komponenPenilaian.find(k=>k.id==sel.dataset.id);
+            if(k) k.mapelId = sel.value;
+            saveAll();
+            renderTabel();
+        }));
+        // Urutan naik/turun untuk semua role
+        document.querySelectorAll(".up-komp").forEach(btn=>btn.addEventListener("click",()=>{
+            let i = parseInt(btn.dataset.idx);
+            if(i>0){
+                [komponenPenilaian[i-1], komponenPenilaian[i]] = [komponenPenilaian[i], komponenPenilaian[i-1]];
+                renderKomponenModal();
+            }
+        }));
+        document.querySelectorAll(".down-komp").forEach(btn=>btn.addEventListener("click",()=>{
+            let i = parseInt(btn.dataset.idx);
+            if(i<komponenPenilaian.length-1){
+                [komponenPenilaian[i+1], komponenPenilaian[i]] = [komponenPenilaian[i], komponenPenilaian[i+1]];
+                renderKomponenModal();
+            }
+        }));
+    }
+    function tambahKomponen() {
+        let nama = document.getElementById("newKomponenNama").value.trim();
+        let mapelId = document.getElementById("newKomponenMapel").value;
+        if(!nama) return alert("Nama komponen harus diisi");
+        komponenPenilaian.push({ id: "komp_"+Date.now(), nama: nama, mapelId: mapelId });
+        document.getElementById("newKomponenNama").value = "";
+        renderKomponenModal();
+        saveAll();
+        renderTabel();
+    }
+    function simpanKomponen() {
+        document.getElementById("komponenModal").classList.add("hidden");
+        renderTabel();
+        alert("Perubahan komponen disimpan.");
+    }
+
+    // ---------- KELOLA ADMIN (hanya Super Admin) ----------
+    function renderAdminModal() { let container=document.getElementById("adminList"); container.innerHTML=""; approvedAdmins.forEach(adm=>{ let div=document.createElement("div"); div.className="flex gap-2 mb-2"; div.innerHTML=`<input class="admin-name border p-1 flex-1" value="${escapeHtml(adm.name)}" data-id="${adm.id}"><input class="admin-pass border p-1 w-28" value="${escapeHtml(adm.password)}" data-id="${adm.id}"><button class="hapus-admin text-red-500" data-id="${adm.id}"><i class="fas fa-trash"></i></button>`; container.appendChild(div); }); attachAdminEvents(); }
+    function attachAdminEvents() { document.querySelectorAll(".hapus-admin").forEach(btn=>btn.addEventListener("click",()=>{approvedAdmins=approvedAdmins.filter(a=>a.id!=btn.dataset.id); renderAdminModal(); updateAdminSelect(); saveAll();})); document.querySelectorAll(".admin-name, .admin-pass").forEach(inp=>inp.addEventListener("change",()=>{let a=approvedAdmins.find(a=>a.id==inp.dataset.id); if(a){if(inp.classList.contains("admin-name")) a.name=inp.value.trim(); else a.password=inp.value.trim(); saveAll(); updateAdminSelect();}})); }
+    function tambahAdmin() { let name=document.getElementById("newAdminName").value.trim(); let pass=document.getElementById("newAdminPass").value.trim(); if(!name||!pass) return; approvedAdmins.push({id:"admin_"+Date.now(), name, password:pass}); document.getElementById("newAdminName").value=""; document.getElementById("newAdminPass").value=""; renderAdminModal(); updateAdminSelect(); saveAll(); }
+    function updateAdminSelect() { let sel=document.getElementById("adminNameSelect"); sel.innerHTML='<option value="">-- Pilih Admin --</option>'; approvedAdmins.forEach(a=>{let opt=document.createElement("option"); opt.value=a.id; opt.innerText=a.name; sel.appendChild(opt);}); }
+    
+    // Backup & Restore
+    function backupData() { let data={mataPelajaran, komponenPenilaian, siswaPerKelas}; let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}); let a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`backup_${new Date().toISOString().slice(0,19)}.json`; a.click(); }
+    function restoreData(file) { let reader=new FileReader(); reader.onload=function(e){let data=JSON.parse(e.target.result); if(data.mataPelajaran && data.komponenPenilaian && data.siswaPerKelas){ mataPelajaran=data.mataPelajaran; komponenPenilaian=data.komponenPenilaian; siswaPerKelas=data.siswaPerKelas; for(let k of semuaKelas) if(!siswaPerKelas[k]) siswaPerKelas[k]=[]; saveAll(); updateDropdown(); renderTabel(); alert("Restore berhasil"); } else alert("File invalid"); }; reader.readAsText(file); }
+    function resetAllData() { if(confirm("RESET SEMUA DATA (termasuk admin)?")){ mataPelajaran=[{id:"mapel1",nama:"Matematika"},{id:"mapel2",nama:"IPA"}]; komponenPenilaian=[{id:"komp1",nama:"Bab 1 - LK 1",mapelId:"mapel1"},{id:"komp2",nama:"Bab 1 - LK 2",mapelId:"mapel1"},{id:"komp3",nama:"Bab 2 - LK 1",mapelId:"mapel1"},{id:"komp4",nama:"Bab 1 - LK 1",mapelId:"mapel2"}]; siswaPerKelas={}; for(let k of semuaKelas) siswaPerKelas[k]=[]; approvedAdmins=[{id:"admin1",name:"Guru Matematika",password:"matematika123"},{id:"admin2",name:"Guru IPA",password:"ipa123"}]; saveAll(); updateDropdown(); renderTabel(); updateAdminSelect(); alert("Data direset"); } }
+
+    function updateDropdown() { let filter=document.getElementById("filterMapel"); filter.innerHTML='<option value="all">Semua Mapel</option>'; mataPelajaran.forEach(m=>{let opt=document.createElement("option"); opt.value=m.id; opt.innerText=m.nama; filter.appendChild(opt);}); let kompMapel=document.getElementById("newKomponenMapel"); if(kompMapel){ kompMapel.innerHTML=""; mataPelajaran.forEach(m=>{let opt=document.createElement("option"); opt.value=m.id; opt.innerText=m.nama; kompMapel.appendChild(opt);}); } }
+    function loadHurufDropdown() { let sel=document.getElementById("selectHuruf"); sel.innerHTML=""; for(let h of ['A','B','C','D','E','F','G','H','I']){ let opt=document.createElement("option"); opt.value=h; opt.innerText=h; if(h===currentHuruf) opt.selected=true; sel.appendChild(opt);} }
+    function switchKelas() { currentTingkat=document.getElementById("selectTingkat").value; currentHuruf=document.getElementById("selectHuruf").value; currentKelas=`${currentTingkat}${currentHuruf}`; renderTabel(); }
+    function openTambahSiswaModal() { document.getElementById("editSiswaId").value=""; document.getElementById("siswaNis").value=""; document.getElementById("siswaNama").value=""; document.getElementById("modalTitle").innerHTML="Tambah Siswa"; document.getElementById("siswaModal").classList.remove("hidden"); }
+    function closeAllModals() { document.querySelectorAll(".fixed").forEach(m=>m.classList.add("hidden")); }
+    function submitSiswaForm(e){e.preventDefault(); let nis=document.getElementById("siswaNis").value.trim(); let nama=document.getElementById("siswaNama").value.trim(); if(!nis||!nama) return; let id=document.getElementById("editSiswaId").value; if(id) editSiswa(id,nis,nama); else tambahSiswa(nis,nama); closeAllModals(); renderTabel();}
+
+    // UI Role
+    function setupRoleUI() { let isSuper=(currentRole==='superadmin'); document.getElementById("superadminButtons").classList.toggle("hidden",!isSuper); document.getElementById("restoreDiv").classList.toggle("hidden",!isSuper); document.getElementById("superAdminInfo").classList.toggle("hidden",!isSuper); document.getElementById("adminInfo").classList.toggle("hidden",isSuper); document.getElementById("roleBadge").innerHTML=isSuper?'<i class="fas fa-crown"></i> Super Admin':`<i class="fas fa-user-shield"></i> Admin: ${escapeHtml(currentAdminName||'')}`; document.getElementById("roleBadge").className=`text-sm px-2 py-1 rounded-full ${isSuper?'bg-red-100 text-red-700':'bg-green-100 text-green-700'}`; }
+
+    // LOGIN
+    document.getElementById("loginRole").addEventListener("change",function(){ let val=this.value; document.getElementById("superadminLoginDiv").classList.toggle("hidden",val!=='superadmin'); document.getElementById("adminLoginDiv").classList.toggle("hidden",val!=='admin'); if(val==='admin') updateAdminSelect(); });
+    function handleLogin() { let role=document.getElementById("loginRole").value; let err=document.getElementById("loginError"); err.classList.add("hidden"); if(role==='superadmin'){ let pwd=document.getElementById("superadminPassword").value; if(pwd===SUPERADMIN_PASS){ currentRole='superadmin'; sessionStorage.setItem("role",'superadmin'); sessionStorage.setItem("logged",'true'); document.getElementById("loginContainer").classList.add("hidden"); document.getElementById("appContainer").classList.remove("hidden"); loadAll(); loadHurufDropdown(); updateDropdown(); switchKelas(); setupRoleUI(); } else { err.innerText="Password Super Admin salah!"; err.classList.remove("hidden"); } } else { let adminId=document.getElementById("adminNameSelect").value; let pwd=document.getElementById("adminPassword").value; let admin=approvedAdmins.find(a=>a.id===adminId); if(!admin){ err.innerText="Pilih admin terlebih dahulu!"; err.classList.remove("hidden"); return; } if(admin.password!==pwd){ err.innerText="Password salah!"; err.classList.remove("hidden"); return; } currentRole='admin'; currentAdminName=admin.name; sessionStorage.setItem("role",'admin'); sessionStorage.setItem("logged",'true'); sessionStorage.setItem("adminName",admin.name); document.getElementById("loginContainer").classList.add("hidden"); document.getElementById("appContainer").classList.remove("hidden"); loadAll(); loadHurufDropdown(); updateDropdown(); switchKelas(); setupRoleUI(); } }
+    function handleLogout() { sessionStorage.clear(); currentRole=null; document.getElementById("loginContainer").classList.remove("hidden"); document.getElementById("appContainer").classList.add("hidden"); document.getElementById("superadminPassword").value=""; document.getElementById("adminPassword").value=""; document.getElementById("adminNameSelect").value=""; }
+    function checkSession() { let logged=sessionStorage.getItem("logged"); let role=sessionStorage.getItem("role"); if(logged==='true' && role==='superadmin'){ currentRole='superadmin'; document.getElementById("loginContainer").classList.add("hidden"); document.getElementById("appContainer").classList.remove("hidden"); loadAll(); loadHurufDropdown(); updateDropdown(); switchKelas(); setupRoleUI(); } else if(logged==='true' && role==='admin'){ let name=sessionStorage.getItem("adminName"); if(name){ currentRole='admin'; currentAdminName=name; document.getElementById("loginContainer").classList.add("hidden"); document.getElementById("appContainer").classList.remove("hidden"); loadAll(); loadHurufDropdown(); updateDropdown(); switchKelas(); setupRoleUI(); } else handleLogout(); } else handleLogout(); }
+
+    // EVENT BINDING
+    document.addEventListener("DOMContentLoaded",()=>{
+        checkSession();
+        document.getElementById("loginBtn").addEventListener("click",handleLogin);
+        document.getElementById("logoutBtn").addEventListener("click",handleLogout);
+        document.getElementById("selectTingkat").addEventListener("change",switchKelas);
+        document.getElementById("selectHuruf").addEventListener("change",switchKelas);
+        document.getElementById("filterMapel").addEventListener("change",()=>{currentFilterMapel=document.getElementById("filterMapel").value; renderTabel();});
+        document.getElementById("btnTambahSiswa").addEventListener("click",openTambahSiswaModal);
+        document.getElementById("btnCetakKelas").addEventListener("click",cetakKelas);
+        document.getElementById("btnManageSubjects").addEventListener("click",()=>{renderMapelModal(); document.getElementById("mapelModal").classList.remove("hidden");});
+        document.getElementById("btnManageComponents").addEventListener("click",()=>{renderKomponenModal(); document.getElementById("komponenModal").classList.remove("hidden");});
+        document.getElementById("btnBackup").addEventListener("click",backupData);
+        document.getElementById("btnManageAdmins").addEventListener("click",()=>{if(currentRole==='superadmin'){renderAdminModal(); document.getElementById("adminModal").classList.remove("hidden");}});
+        document.getElementById("btnResetAll").addEventListener("click",()=>{if(currentRole==='superadmin') resetAllData();});
+        document.getElementById("addMapelBtn").addEventListener("click",tambahMapel);
+        document.getElementById("saveMapelBtn").addEventListener("click",simpanMapel);
+        document.getElementById("addKomponenBtn").addEventListener("click",tambahKomponen);
+        document.getElementById("saveKomponenBtn").addEventListener("click",simpanKomponen);
+        document.getElementById("addAdminBtn").addEventListener("click",tambahAdmin);
+        document.querySelectorAll(".closeModalBtn, .closeMapelModal, .closeKomponenModal, .closeAdminModal, #closeAdminModalBtn").forEach(btn=>btn.addEventListener("click",closeAllModals));
+        document.getElementById("siswaForm").addEventListener("submit",submitSiswaForm);
+        document.getElementById("importExcel").addEventListener("change",e=>{if(e.target.files.length){let file=e.target.files[0]; let reader=new FileReader(); reader.onload=function(ev){let data=new Uint8Array(ev.target.result); let wb=XLSX.read(data,{type:'array'}); let sheet=wb.Sheets[wb.SheetNames[0]]; let rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:""}); for(let i=1;i<rows.length;i++){let nis=(rows[i][0]||"").toString().trim(); let nama=(rows[i][1]||"").toString().trim(); if(nis&&nama && !getSiswaList().find(s=>s.nis===nis)) tambahSiswa(nis,nama);} renderTabel(); alert("Import selesai");}; reader.readAsArrayBuffer(file);} e.target.value='';});
+        document.getElementById("restoreFile").addEventListener("change",e=>{if(e.target.files.length && currentRole==='superadmin') restoreData(e.target.files[0]); e.target.value='';});
+        updateAdminSelect();
+        document.getElementById("loginRole").dispatchEvent(new Event("change"));
+    });
+</script>
+</body>
+</html>
