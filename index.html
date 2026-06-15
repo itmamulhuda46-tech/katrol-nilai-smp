@@ -8,14 +8,26 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
+        /* Perbaikan CSS khusus untuk Cetak PDF / Print */
+        @media screen {
+            #print-area { display: none !important; }
+        }
+        
         @media print {
-            body * { visibility: hidden; }
-            #print-area, #print-area * { visibility: visible; }
-            #print-area { position: absolute; top: 0; left: 0; width: 100%; }
+            /* Sembunyikan semua elemen di body KECUALI area print */
+            body > *:not(#print-area) { display: none !important; }
+            #print-area { 
+                display: block !important; 
+                width: 100%; 
+                position: static;
+                color: black;
+            }
             .no-print { display: none !important; }
             table { border-collapse: collapse; width: 100%; }
-            th, td { border: 1px solid black; padding: 5px; }
+            th, td { border: 1px solid black !important; padding: 6px; }
+            @page { size: auto; margin: 15mm; }
         }
+        
         .table-wrapper { overflow-x: auto; }
         @media (max-width: 640px) {
             .container { padding-left: 0.5rem; padding-right: 0.5rem; }
@@ -74,17 +86,28 @@
             <span class="font-bold text-xl">Katrol Nilai SMP</span>
             <span id="roleBadge" class="text-sm px-2 py-1 rounded-full ml-2"></span>
         </div>
-        <div class="flex items-center space-x-4 mt-2 sm:mt-0">
-            <div id="superadminButtons" class="flex space-x-2">
-                <button id="btnManageAdmins" class="bg-pink-500 hover:bg-pink-600 text-white px-3 py-1 rounded-lg text-sm"><i class="fas fa-users-cog"></i> Kelola Admin</button>
-                <button id="btnResetAll" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-sm"><i class="fas fa-trash-alt"></i> Reset Data</button>
+        <div class="relative inline-block text-left mt-2 sm:mt-0 z-40">
+            <div>
+                <button type="button" id="menuToggleBtn" class="inline-flex justify-center items-center w-full rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-bars mr-2"></i> Menu Aksi
+                    <i class="fas fa-chevron-down ml-2 text-xs"></i>
+                </button>
             </div>
-            <div id="adminButtons" class="flex space-x-2">
-                <button id="btnManageSubjects" class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded-lg text-sm"><i class="fas fa-book"></i> Kelola Mapel</button>
-                <button id="btnManageComponents" class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded-lg text-sm"><i class="fas fa-tasks"></i> Kelola Komponen</button>
-                <button id="btnBackup" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-lg text-sm"><i class="fas fa-download"></i> Backup</button>
+            <!-- Dropdown panel -->
+            <div id="dropdownMenu" class="hidden origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 transition-all">
+                <div id="superadminButtons" class="py-1 hidden">
+                    <button id="btnManageAdmins" class="group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 hover:text-pink-700"><i class="fas fa-users-cog w-5 mr-2 text-pink-500"></i> Kelola Admin</button>
+                    <button id="btnResetAll" class="group flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"><i class="fas fa-trash-alt w-5 mr-2 text-red-500"></i> Reset Data</button>
+                </div>
+                <div id="adminButtons" class="py-1 hidden">
+                    <button id="btnManageSubjects" class="group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700"><i class="fas fa-book w-5 mr-2 text-purple-500"></i> Kelola Mapel</button>
+                    <button id="btnManageComponents" class="group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700"><i class="fas fa-tasks w-5 mr-2 text-indigo-500"></i> Kelola Komponen</button>
+                    <button id="btnBackup" class="group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-700"><i class="fas fa-download w-5 mr-2 text-yellow-500"></i> Backup Data</button>
+                </div>
+                <div class="py-1">
+                    <button id="logoutBtn" class="group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"><i class="fas fa-sign-out-alt w-5 mr-2 text-gray-500"></i> Logout</button>
+                </div>
             </div>
-            <button id="logoutBtn" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-1 rounded-lg text-sm"><i class="fas fa-sign-out-alt"></i> Logout</button>
         </div>
     </nav>
     <div class="container mx-auto px-4 py-6">
@@ -325,6 +348,7 @@
 
     function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
     
+    // --- PERBAIKAN FITUR CETAK PDF ---
     function cetakKelas() {
         let siswaList = getSiswaList();
         let kompList = currentFilterMapel==="all" ? komponenPenilaian : komponenPenilaian.filter(k=>k.mapelId===currentFilterMapel);
@@ -332,39 +356,52 @@
         
         let mapelText = currentFilterMapel==="all" ? "Semua Mapel" : mataPelajaran.find(m=>m.id === currentFilterMapel)?.nama;
 
+        // Hapus area print sebelumnya (mencegah bug tercetak double)
+        let oldPrintArea = document.getElementById("print-area");
+        if(oldPrintArea) oldPrintArea.remove();
+
         let printDiv = document.createElement('div');
         printDiv.id = "print-area";
         printDiv.innerHTML = `
             <div style="text-align:center; margin-bottom: 20px;">
-                <h2 style="margin: 0; font-size: 24px;">LAPORAN NILAI SISWA</h2>
-                <h3 style="margin: 5px 0;">Kelas: ${currentKelas} | Mapel: ${mapelText}</h3>
+                <h2 style="margin: 0; font-size: 24px; color: black;">LAPORAN NILAI SISWA</h2>
+                <h3 style="margin: 5px 0; color: black;">Kelas: ${currentKelas} | Mapel: ${mapelText}</h3>
             </div>
-            <table border="1" cellpadding="5" style="width: 100%; border-collapse: collapse; font-size: 12px; font-family: sans-serif;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px; font-family: Arial, sans-serif; color: black;">
                 <thead>
                     <tr>
-                        <th style="background:#eee">No</th>
-                        <th style="background:#eee">NIS</th>
-                        <th style="background:#eee; text-align:left;">Nama</th>
-                        ${kompList.map(k=>`<th style="background:#eee">${escapeHtml(k.nama)}</th>`).join('')}
-                        <th style="background:#eee">Rata-rata</th>
+                        <th style="background:#f3f4f6; border: 1px solid black; padding: 6px; text-align: center;">No</th>
+                        <th style="background:#f3f4f6; border: 1px solid black; padding: 6px; text-align: center;">NIS</th>
+                        <th style="background:#f3f4f6; border: 1px solid black; padding: 6px; text-align: left;">Nama</th>
+                        ${kompList.map(k=>`<th style="background:#f3f4f6; border: 1px solid black; padding: 6px; text-align: center;">${escapeHtml(k.nama)}</th>`).join('')}
+                        <th style="background:#f3f4f6; border: 1px solid black; padding: 6px; text-align: center;">Rata-rata</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${siswaList.map((sis,idx)=>`
                     <tr>
-                        <td style="text-align:center">${idx+1}</td>
-                        <td style="text-align:center">${escapeHtml(sis.nis)}</td>
-                        <td>${escapeHtml(sis.nama)}</td>
-                        ${kompList.map(k=>`<td style="text-align:center">${sis.nilai[k.id]!==null?sis.nilai[k.id]:'-'}</td>`).join('')}
-                        <td style="text-align:center; font-weight:bold;">${hitungRata(sis,kompList)!==null?hitungRata(sis,kompList):'-'}</td>
+                        <td style="border: 1px solid black; text-align:center; padding: 6px;">${idx+1}</td>
+                        <td style="border: 1px solid black; text-align:center; padding: 6px;">${escapeHtml(sis.nis)}</td>
+                        <td style="border: 1px solid black; padding: 6px;">${escapeHtml(sis.nama)}</td>
+                        ${kompList.map(k=>`<td style="border: 1px solid black; text-align:center; padding: 6px;">${sis.nilai[k.id]!==null?sis.nilai[k.id]:'-'}</td>`).join('')}
+                        <td style="border: 1px solid black; text-align:center; font-weight:bold; padding: 6px;">${hitungRata(sis,kompList)!==null?hitungRata(sis,kompList):'-'}</td>
                     </tr>`).join('')}
                 </tbody>
             </table>
         `;
         document.body.appendChild(printDiv);
-        window.print();
-        setTimeout(()=>document.body.removeChild(printDiv),100);
+        
+        // Cukup panggil print setelah elemen ter-load. Browser akan menangani sisanya.
+        setTimeout(() => {
+            window.print();
+        }, 500);
     }
+
+    // Membersihkan area cetak SECARA OTOMATIS setelah proses cetak / PDF selesai atau dibatalkan
+    window.addEventListener('afterprint', () => {
+        let pArea = document.getElementById("print-area");
+        if(pArea) pArea.remove();
+    });
 
     // ---------- KELOLA MAPEL & KKM ----------
     function renderMapelModal() {
@@ -665,6 +702,10 @@
     function setupRoleUI() { 
         let isSuper=(currentRole==='superadmin'); 
         document.getElementById("superadminButtons").classList.toggle("hidden",!isSuper); 
+        
+        // PERBAIKAN: Memastikan menu admin (Kelola Mapel/KKM, Komponen, dan Backup) selalu muncul di Menu Aksi
+        document.getElementById("adminButtons").classList.remove("hidden"); 
+        
         document.getElementById("restoreDiv").classList.toggle("hidden",!isSuper); 
         document.getElementById("superAdminInfo").classList.toggle("hidden",!isSuper); 
         document.getElementById("adminInfo").classList.toggle("hidden",isSuper); 
@@ -807,6 +848,26 @@
             updateDropdown();
             switchKelas();
             setupRoleUI();
+        }
+
+        // --- BINDING DROPDOWN MENU ---
+        const menuToggleBtn = document.getElementById('menuToggleBtn');
+        const dropdownMenu = document.getElementById('dropdownMenu');
+        
+        if(menuToggleBtn && dropdownMenu) {
+            menuToggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdownMenu.classList.toggle('hidden');
+            });
+            document.addEventListener('click', (e) => {
+                if (!dropdownMenu.contains(e.target) && !menuToggleBtn.contains(e.target)) {
+                    dropdownMenu.classList.add('hidden');
+                }
+            });
+            // Tutup dropdown otomatis jika salah satu menu di dalamnya diklik
+            dropdownMenu.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', () => dropdownMenu.classList.add('hidden'));
+            });
         }
 
         // Bindings
