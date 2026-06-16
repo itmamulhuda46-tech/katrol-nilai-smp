@@ -146,7 +146,7 @@
             </div>
             
             <div class="mt-4 text-sm text-gray-500 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                <i class="fas fa-info-circle text-blue-500 mr-1"></i> <strong>Import Excel:</strong> Siapkan file dengan <strong>kolom A = NIS</strong>, dan <strong>kolom B = Nama Lengkap</strong> (baris pertama otomatis diabaikan jika berupa header teks). Nilai akan diwarnai <strong class="text-red-500">merah</strong> jika di bawah KKM.
+                <i class="fas fa-info-circle text-blue-500 mr-1"></i> <strong>Import Excel:</strong> Siapkan file dengan <strong>kolom A = NIS</strong>, dan <strong>kolom B = Nama Lengkap</strong>. Rata-rata & warna KKM <strong class="text-red-500">merah</strong> akan otomatis menyesuaikan ketikan tanpa lag.
             </div>
             <div id="superAdminInfo" class="mt-2 text-sm text-indigo-700 bg-indigo-50 p-2 rounded-lg border border-indigo-100 hidden"><i class="fas fa-crown mr-1"></i> <strong>Akses Super Admin:</strong> Kelola akun admin, hapus seluruh data (Reset), restore backup data, hapus mapel & KKM, hapus komponen.</div>
             <div id="adminInfo" class="mt-2 text-sm text-green-700 bg-green-50 p-2 rounded-lg border border-green-100 hidden"><i class="fas fa-user-shield mr-1"></i> <strong>Akses Admin:</strong> Kelola mapel & KKM (tambah/edit), kelola komponen, input nilai, import excel, cetak PDF laporan.</div>
@@ -252,10 +252,6 @@
 </div>
 
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
     // --- SECURITY: DISABLE DEV TOOLS & MANIPULATION ---
     document.addEventListener('contextmenu', e => e.preventDefault());
     document.addEventListener('keydown', e => {
@@ -269,20 +265,37 @@
     console.log = console.warn = console.info = console.error = function() {};
 
     // ---------- GLOBAL VARIABLES ----------
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-katrol-app';
-    const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
-    const firebaseConfig = JSON.parse(firebaseConfigStr);
     let app, db, auth;
     let useFirebase = false;
-    
-    try {
+    let setDoc, getDoc, doc, signInAnonymously, signInWithCustomToken;
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-katrol-app';
+
+    // PERBAIKAN: Dynamic Import Firebase HANYA jika ada konfigurasi
+    // Ini menghentikan browser dari mencoba men-download file besar Firebase di Vercel secara sia-sia.
+    const initFirebase = async () => {
+        const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
+        const firebaseConfig = JSON.parse(firebaseConfigStr);
         if(Object.keys(firebaseConfig).length > 0) {
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-            useFirebase = true;
+            try {
+                const [appModule, authModule, firestoreModule] = await Promise.all([
+                    import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"),
+                    import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"),
+                    import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js")
+                ]);
+                app = appModule.initializeApp(firebaseConfig);
+                auth = authModule.getAuth(app);
+                db = firestoreModule.getFirestore(app);
+                
+                setDoc = firestoreModule.setDoc;
+                getDoc = firestoreModule.getDoc;
+                doc = firestoreModule.doc;
+                signInAnonymously = authModule.signInAnonymously;
+                signInWithCustomToken = authModule.signInWithCustomToken;
+                
+                useFirebase = true;
+            } catch(e) { }
         }
-    } catch(e) {}
+    };
 
     let currentRole = null;
     let currentAdminName = null;
@@ -300,7 +313,7 @@
     const STORAGE_MAPEL = "KatrolMapel";
     const STORAGE_ADMINS = "KatrolAdmins";
 
-    // --- CORE & FIREBASE FUNCTIONS ---
+    // --- CORE & DATA FUNCTIONS ---
     let saveTimeout = null;
     function saveAll() {
         localStorage.setItem(STORAGE_SISWA, JSON.stringify(siswaPerKelas));
@@ -432,15 +445,53 @@
                 let isBelowKKM = val !== null && val !== '' && val < kkm;
                 let textColor = isBelowKKM ? 'text-red-600 font-bold bg-red-50' : 'text-gray-900';
 
-                html += `<td class="border-b border-gray-200 p-2 text-center"><input type="number" class="nilai-input w-16 p-1.5 border border-gray-300 rounded text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all ${textColor}" data-siswa="${sis.id}" data-komp="${k.id}" value="${val!==null?val:''}" min="0" max="100"></td>`;
+                // PERBAIKAN: Beri id khusus agar bisa diupdate warnanya tanpa re-render semua html
+                html += `<td class="border-b border-gray-200 p-2 text-center"><input type="number" id="inp-${sis.id}-${k.id}" class="nilai-input w-16 p-1.5 border border-gray-300 rounded text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all ${textColor}" data-siswa="${sis.id}" data-komp="${k.id}" value="${val!==null?val:''}" min="0" max="100"></td>`;
             });
-            html += `<td class="border-b border-gray-200 p-3 font-bold text-center bg-indigo-50/30 text-indigo-900">${rata!==null?rata:'-'}</td>`;
+            // PERBAIKAN: Beri ID untuk Rata-rata agar tidak perlu reload tabel
+            html += `<td id="rata-${sis.id}" class="border-b border-gray-200 p-3 font-bold text-center bg-indigo-50/30 text-indigo-900">${rata!==null?rata:'-'}</td>`;
             html += `<td class="border-b border-gray-200 p-3 text-center whitespace-nowrap"><button class="edit-siswa text-blue-500 hover:text-blue-700 hover:bg-blue-100 p-1.5 rounded transition-colors mr-1" data-id="${sis.id}"><i class="fas fa-edit"></i></button> <button class="hapus-siswa text-red-500 hover:text-red-700 hover:bg-red-100 p-1.5 rounded transition-colors" data-id="${sis.id}"><i class="fas fa-trash"></i></button></td>`;
             html += `</tr>`;
         });
         tbody.innerHTML = html;
         
-        document.querySelectorAll('.nilai-input').forEach(inp => inp.addEventListener('change', (e) => { updateNilai(inp.dataset.siswa, inp.dataset.komp, inp.value); renderTabel(); }));
+        // PERBAIKAN: Hanya update 1 sel Rata-rata dan Simpan ke Memory. Hentikan RenderTabel!
+        document.querySelectorAll('.nilai-input').forEach(inp => inp.addEventListener('change', (e) => { 
+            let siswaId = inp.dataset.siswa;
+            let kompId = inp.dataset.komp;
+            let val = inp.value;
+            
+            // Perbaiki tampilan jika input user melewati batas (0-100)
+            let n = val === "" ? null : parseInt(val); 
+            if(isNaN(n)) n = null; 
+            if(n !== null && n < 0) n = 0; 
+            if(n !== null && n > 100) n = 100; 
+            inp.value = n !== null ? n : ''; 
+
+            // Simpan ke memori di balik layar
+            updateNilai(siswaId, kompId, val); 
+            
+            // Perbarui perhitungan Rata-rata 1 baris saja!
+            let siswa = getSiswaList().find(s => s.id == siswaId);
+            if(siswa) {
+                let rataBaru = hitungRata(siswa, kompList);
+                let tdRata = document.getElementById(`rata-${siswaId}`);
+                if(tdRata) tdRata.innerText = rataBaru !== null ? rataBaru : '-';
+
+                // Perbarui warna secara langsung jika KKM
+                let k = kompList.find(x => x.id === kompId);
+                let mapel = mataPelajaran.find(m => m.id === k?.mapelId);
+                let kkm = mapel ? mapel.kkm : 75;
+                if (n !== null && n < kkm) {
+                    inp.classList.add('text-red-600', 'font-bold', 'bg-red-50');
+                    inp.classList.remove('text-gray-900');
+                } else {
+                    inp.classList.remove('text-red-600', 'font-bold', 'bg-red-50');
+                    inp.classList.add('text-gray-900');
+                }
+            }
+        }));
+
         document.querySelectorAll('.edit-siswa').forEach(btn => btn.addEventListener('click', () => { 
             let id = btn.dataset.id; let s = getSiswaList().find(s => s.id == id); 
             if(s) { 
@@ -548,7 +599,7 @@
                 m.kkm = val;
                 inp.value = val;
                 saveAll();
-                renderTabel(); // Update UI red text realtime
+                renderTabel();
             }
         }));
     }
@@ -652,7 +703,6 @@
         approvedAdmins.forEach(adm => { 
             let div = document.createElement("div"); 
             div.className = "flex gap-2 mb-2 items-center bg-white p-2 rounded-lg border border-gray-200 shadow-sm"; 
-            // Decode b64 text to display
             let decPass = ""; try { decPass = atob(adm.password); } catch(e) { decPass = adm.password; }
             div.innerHTML = `
                 <div class="flex-1 font-medium text-gray-800 px-2"><i class="fas fa-user-circle text-gray-400 mr-2"></i>${escapeHtml(adm.name)}</div>
@@ -673,7 +723,7 @@
             let a = approvedAdmins.find(a => a.id == inp.dataset.id); 
             if(a){
                 let p = inp.value.trim();
-                if(p) a.password = btoa(p); // Encode b64
+                if(p) a.password = btoa(p);
                 saveAll(); updateAdminSelect();
             }
         })); 
@@ -910,14 +960,12 @@
         dropdownMenu.classList.toggle('hidden');
     }
 
-    // Close when clicking outside menu
     window.addEventListener('click', function(e) {
         if (menuToggleBtn && !menuToggleBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
             dropdownMenu.classList.add('hidden');
         }
     });
 
-    // Modals
     function openTambahSiswaModal() { 
         document.getElementById("editSiswaId").value = ""; 
         document.getElementById("siswaNis").value = ""; 
@@ -940,10 +988,10 @@
 
     // --- EVENT BINDING ON LOAD ---
     window.onload = async () => {
-        // Init Storage/Firebase
+        // Init Storage & Dynamic Firebase
+        await initFirebase();
         await loadAll();
 
-        // Check active session
         if(sessionStorage.getItem("logged") === 'true') {
             currentRole = sessionStorage.getItem("role");
             if(currentRole === 'admin') currentAdminName = sessionStorage.getItem("adminName");
@@ -953,22 +1001,19 @@
             loadHurufDropdown(); updateDropdown(); switchKelas(); setupRoleUI();
         }
 
-        // Login Triggers
+        // Event Listeners
         document.getElementById("loginBtn").addEventListener("click", handleLogin);
         document.getElementById("superadminPassword").addEventListener("keyup", e => { if(e.key === "Enter") handleLogin(); });
         document.getElementById("adminPassword").addEventListener("keyup", e => { if(e.key === "Enter") handleLogin(); });
 
-        // Filter / Controls
         document.getElementById("selectTingkat").addEventListener("change", switchKelas);
         document.getElementById("selectHuruf").addEventListener("change", switchKelas);
         document.getElementById("filterMapel").addEventListener("change", e => { currentFilterMapel = e.target.value; renderTabel(); });
         document.getElementById("btnCetakKelas").addEventListener("click", cetakKelas);
         document.getElementById("btnTambahSiswa").addEventListener("click", openTambahSiswaModal);
 
-        // Dropdown Toggle Setup
         if(menuToggleBtn) menuToggleBtn.addEventListener("click", toggleDropdown);
         
-        // Action Menus in Dropdown
         document.getElementById("btnManageAdmins").addEventListener("click", () => { renderAdminModal(); document.getElementById("adminModal").classList.remove("hidden"); dropdownMenu.classList.add('hidden'); });
         document.getElementById("btnManageSubjects").addEventListener("click", () => { renderMapelModal(); document.getElementById("mapelModal").classList.remove("hidden"); dropdownMenu.classList.add('hidden'); });
         document.getElementById("btnManageComponents").addEventListener("click", () => { renderKomponenModal(); document.getElementById("komponenModal").classList.remove("hidden"); dropdownMenu.classList.add('hidden'); });
@@ -977,10 +1022,8 @@
         document.getElementById("logoutBtn").addEventListener("click", handleLogout);
         document.getElementById("restoreFile").addEventListener("change", e => { if(e.target.files.length) restoreData(e.target.files[0]); });
 
-        // Closing Modals
         document.querySelectorAll(".closeModalBtn, .closeMapelModal, .closeKomponenModal, .closeAdminModal, #closeAdminModalBtn, #saveMapelBtn, #saveKomponenBtn").forEach(btn => btn.addEventListener("click", closeAllModals));
 
-        // Submit Forms
         document.getElementById("siswaForm").addEventListener("submit", submitSiswaForm);
         document.getElementById("addMapelBtn").addEventListener("click", tambahMapel);
         document.getElementById("addKomponenBtn").addEventListener("click", tambahKomponen);
