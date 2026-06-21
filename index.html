@@ -1027,29 +1027,36 @@
 
         let mapelText = currentFilterMapel === "all" ? "Semua Mapel" : mataPelajaran.find(m => m.id === currentFilterMapel)?.nama;
 
-        // --- SOLUSI PAMUNGKAS ANTI-TERPOTONG (Auto-Fit) ---
+        // --- SOLUSI AUTO-FIT TOTAL ---
+        // Lebar halaman aktif A4 landscape di 96 DPI adalah sekitar 1046px (dengan margin 10mm).
+        // Kita kunci lebar container utama tepat di 1046px agar pas sempurna dengan kertas tanpa terpotong kanan/kiri.
+        let pdfWidth = 1046;
+
+        // Alokasi lebar kolom dalam persentase
+        let colWidthPercent = kompList.length > 0 ? (62 / kompList.length) : 62;
+
         let htmlContent = `
-            <div id="pdf-content" style="display: inline-block; min-width: 1122px; background-color: #ffffff; padding: 20px 30px; color: #000000; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box;">
+            <div id="pdf-container" style="background-color: #ffffff; padding: 20px; color: #000000; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; width: ${pdfWidth}px; box-sizing: border-box;">
                 <div style="text-align:center; margin-bottom: 20px;">
-                    <h2 style="margin: 0 0 8px 0; font-size: 24px; color: black; text-transform: uppercase; letter-spacing: 1px;">Laporan Rekapitulasi Nilai Siswa</h2>
-                    <h3 style="margin: 0 0 12px 0; color: #333; font-weight: normal; font-size: 16px;">
+                    <h2 style="margin: 0 0 8px 0; font-size: 22px; color: black; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;">Laporan Rekapitulasi Nilai Siswa</h2>
+                    <h3 style="margin: 0 0 12px 0; color: #333; font-weight: normal; font-size: 14px;">
                         Kelas: <strong>${currentKelas}</strong> &nbsp;|&nbsp; Mapel: <strong>${escapeHtml(mapelText)}</strong>
                     </h3>
-                    <hr style="border: none; border-top: 2px solid #000; margin: 0 auto; width: 100%;">
+                    <div style="border-bottom: 2px solid #000; margin: 0 auto; width: 100%;"></div>
                 </div>
                 
-                <table style="border-collapse: collapse; font-size: 11px; color: black; margin-bottom: 20px; width: 100%;">
+                <table style="border-collapse: collapse; font-size: 10px; color: black; width: 100%; table-layout: fixed; word-wrap: break-word;">
                     <thead>
                         <tr>
-                            <th style="background:#f1f5f9; border: 1px solid #000; padding: 8px 4px; text-align: center; width: 35px;">No</th>
-                            <th style="background:#eef2ff; border: 1px solid #000; padding: 8px 4px; text-align: center; width: 65px;">Peringkat</th>
-                            <th style="background:#f1f5f9; border: 1px solid #000; padding: 8px 4px; text-align: left; min-width: 150px;">Nama Lengkap</th>
+                            <th style="background:#f1f5f9; border: 1px solid #000; padding: 6px 4px; text-align: center; width: 4%;">No</th>
+                            <th style="background:#eef2ff; border: 1px solid #000; padding: 6px 4px; text-align: center; width: 6%;">Peringkat</th>
+                            <th style="background:#f1f5f9; border: 1px solid #000; padding: 6px 4px; text-align: left; width: 22%;">Nama Lengkap</th>
                             ${kompList.map(k => `
-                                <th style="background:#f1f5f9; border: 1px solid #000; padding: 8px 4px; text-align: center; min-width: 70px; max-width: 120px; word-wrap: break-word;">
+                                <th style="background:#f1f5f9; border: 1px solid #000; padding: 6px 4px; text-align: center; width: ${colWidthPercent}%; font-size: 9px; word-wrap: break-word; overflow: hidden;">
                                     ${escapeHtml(k.nama)}
                                 </th>
                             `).join('')}
-                            <th style="background:#e2e8f0; border: 1px solid #000; padding: 8px 4px; text-align: center; width: 60px;">Rata</th>
+                            <th style="background:#e2e8f0; border: 1px solid #000; padding: 6px 4px; text-align: center; width: 6%;">Rata</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1057,83 +1064,80 @@
                             let rata = hitungRata(sis, kompList);
                             let rowHTML = `
                             <tr>
-                                <td style="border: 1px solid #000; text-align:center; padding: 6px 4px;">${idx + 1}</td>
-                                <td style="border: 1px solid #000; text-align:center; padding: 6px 4px; font-weight:bold;">${rankMap[sis.id]}</td>
-                                <td style="border: 1px solid #000; padding: 6px 4px; white-space: nowrap;">${escapeHtml(sis.nama)}</td>`;
+                                <td style="border: 1px solid #000; text-align:center; padding: 6px; width: 4%;">${idx + 1}</td>
+                                <td style="border: 1px solid #000; text-align:center; padding: 6px; font-weight:bold; width: 6%;">${rankMap[sis.id]}</td>
+                                <td style="border: 1px solid #000; padding: 6px; width: 22%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(sis.nama)}</td>`;
                             
                             let colsHTML = kompList.map(k => {
                                 let v = sis.nilai[k.id];
                                 let mapel = mataPelajaran.find(m => m.id === k.mapelId);
                                 let isRed = v !== null && mapel && v < mapel.kkm;
                                 let style = isRed ? "color: red; font-weight: bold;" : "";
-                                return `<td style="border: 1px solid #000; text-align:center; padding: 6px 4px; ${style}">${v !== null && v !== undefined ? v : '-'}</td>`;
+                                return `<td style="border: 1px solid #000; text-align:center; padding: 6px; width: ${colWidthPercent}%; ${style}">${v !== null && v !== undefined ? v : '-'}</td>`;
                             }).join('');
 
                             rowHTML += colsHTML;
-                            rowHTML += `<td style="border: 1px solid #000; text-align:center; font-weight:bold; padding: 6px 4px; background:#f8fafc;">${rata !== null ? rata : '-'}</td></tr>`;
+                            rowHTML += `<td style="border: 1px solid #000; text-align:center; font-weight:bold; padding: 6px; width: 6%; background:#f8fafc;">${rata !== null ? rata : '-'}</td></tr>`;
                             
                             return rowHTML;
                         }).join('')}
                     </tbody>
                 </table>
-                <div style="text-align: right; font-size: 11px; color: #333; margin-top: 15px;">
+                <div style="text-align: right; font-size: 10px; color: #333; margin-top: 15px;">
                     <p>Dicetak pada: ${new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} WIB</p>
                 </div>
             </div>
         `;
-
-        // Membuat kanvas raksasa berukuran 30.000px agar tabel sebebas mungkin membentang.
-        let printContainer = document.createElement('div');
-        printContainer.style.position = 'absolute';
-        printContainer.style.left = '0';
-        printContainer.style.top = '0';
-        printContainer.style.zIndex = '-9999';
-        printContainer.style.pointerEvents = 'none';
-        printContainer.style.width = '30000px'; 
-        printContainer.innerHTML = htmlContent;
-        document.body.appendChild(printContainer);
-
-        // Setelah dirender sekejap, kita ukur lebar aktual tabelnya (misal 1500px)
-        let targetElement = printContainer.firstElementChild;
-        let actualWidth = targetElement.offsetWidth;
-        let actualHeight = targetElement.offsetHeight;
 
         let btn = document.getElementById("btnCetakKelas");
         let originalText = btn.innerHTML;
         btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Menyimpan PDF...`;
         btn.disabled = true;
 
-        // Kita suplai ukuran aktual tersebut ke alat pengonversi PDF
+        // Gunakan posisi absolut di sudut atas dengan opacity 0 agar tidak mengganggu UI,
+        // namun kordinat origin x: 0, y: 0 tetap terbaca sempurna oleh html2canvas.
+        let tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlContent;
+        tempDiv.style.position = 'absolute';
+        tempDiv.style.left = '0';
+        tempDiv.style.top = '0';
+        tempDiv.style.opacity = '0';
+        tempDiv.style.zIndex = '-9999';
+        tempDiv.style.pointerEvents = 'none';
+        tempDiv.style.width = pdfWidth + 'px';
+        document.body.appendChild(tempDiv);
+
         var opt = {
-            margin:       [5, 5, 5, 5], 
+            margin:       [10, 10, 10, 10], 
             filename:     `Rekap_Nilai_Kelas_${currentKelas}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
             html2canvas:  { 
                 scale: 2, 
-                useCORS: true, 
-                width: actualWidth,         // Jaminan tidak terpotong ke samping
-                height: actualHeight,       // Jaminan tidak terpotong ke bawah
-                windowWidth: actualWidth,
-                windowHeight: actualHeight,
-                scrollX: 0,                 // Jaminan titik nol selalu presisi di kiri (Tidak terpotong di kiri)
+                useCORS: true,
+                windowWidth: pdfWidth, // Paksa windowWidth agar layout selalu selebar tabel 1046px
+                scrollX: 0,
                 scrollY: 0,
                 x: 0,
                 y: 0
             }, 
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' },
+            pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
         };
 
-        html2pdf().set(opt).from(targetElement).save().then(() => {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-            document.body.removeChild(printContainer);
-        }).catch(err => {
-            console.error(err);
-            customAlert("Gagal", "Terjadi kesalahan saat memproses PDF.", "danger");
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-            if(document.body.contains(printContainer)) document.body.removeChild(printContainer);
-        });
+        // Beri sedikit delay agar browser selesai merender CSS layout
+        setTimeout(() => {
+            html2pdf().set(opt).from(tempDiv.firstElementChild).save().then(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                document.body.removeChild(tempDiv);
+            }).catch(err => {
+                console.error(err);
+                customAlert("Gagal", "Terjadi kesalahan saat memproses PDF.", "danger");
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                if(document.body.contains(tempDiv)) document.body.removeChild(tempDiv);
+            });
+        }, 300);
     }
 
     // --- STREAMING_CHUNK: Logika Manajemen Modals Pengaturan ---
