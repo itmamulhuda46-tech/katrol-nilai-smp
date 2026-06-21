@@ -1004,7 +1004,7 @@
         }
     };
 
-    // --- STREAMING_CHUNK: Logika Cetak PDF Laporan (Metode Paling Stabil: Tanpa Inject ke Body) ---
+    // --- STREAMING_CHUNK: Logika Cetak PDF Laporan (Metode Paling Stabil Tanpa Terpotong) ---
     function cetakKelas() {
         let siswaList = getSiswaList();
         let kompList = currentFilterMapel === "all" ? komponenPenilaian : komponenPenilaian.filter(k => k.mapelId === currentFilterMapel);
@@ -1027,32 +1027,29 @@
 
         let mapelText = currentFilterMapel === "all" ? "Semua Mapel" : mataPelajaran.find(m => m.id === currentFilterMapel)?.nama;
 
-        // --- SOLUSI ANTI TERPOTONG KIRI KANAN ---
-        // Lebar akan dihitung berdasarkan total kolom. Tidak akan menggunakan ukuran layar (viewport) sama sekali!
-        let finalWidth = Math.max(1122, 350 + (kompList.length * 85));
-
+        // --- SOLUSI PAMUNGKAS ANTI-TERPOTONG (Auto-Fit) ---
         let htmlContent = `
-            <div style="width: ${finalWidth}px; background-color: #ffffff; padding: 20px 30px; color: #000000; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box;">
+            <div id="pdf-content" style="display: inline-block; min-width: 1122px; background-color: #ffffff; padding: 20px 30px; color: #000000; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box;">
                 <div style="text-align:center; margin-bottom: 20px;">
                     <h2 style="margin: 0 0 8px 0; font-size: 24px; color: black; text-transform: uppercase; letter-spacing: 1px;">Laporan Rekapitulasi Nilai Siswa</h2>
                     <h3 style="margin: 0 0 12px 0; color: #333; font-weight: normal; font-size: 16px;">
                         Kelas: <strong>${currentKelas}</strong> &nbsp;|&nbsp; Mapel: <strong>${escapeHtml(mapelText)}</strong>
                     </h3>
-                    <div style="border-top: 2px solid #000; margin: 0 auto; width: 100%;"></div>
+                    <hr style="border: none; border-top: 2px solid #000; margin: 0 auto; width: 100%;">
                 </div>
                 
-                <table style="width: 100%; border-collapse: collapse; font-size: 11px; color: black; margin-bottom: 20px; table-layout: fixed; word-wrap: break-word;">
+                <table style="border-collapse: collapse; font-size: 11px; color: black; margin-bottom: 20px; width: 100%;">
                     <thead>
                         <tr>
-                            <th style="background:#f1f5f9; border: 1px solid #000; padding: 8px 4px; text-align: center; width: 40px;">No</th>
-                            <th style="background:#eef2ff; border: 1px solid #000; padding: 8px 4px; text-align: center; width: 70px;">Peringkat</th>
-                            <th style="background:#f1f5f9; border: 1px solid #000; padding: 8px 4px; text-align: left; width: 160px;">Nama Lengkap</th>
+                            <th style="background:#f1f5f9; border: 1px solid #000; padding: 8px 4px; text-align: center; width: 35px;">No</th>
+                            <th style="background:#eef2ff; border: 1px solid #000; padding: 8px 4px; text-align: center; width: 65px;">Peringkat</th>
+                            <th style="background:#f1f5f9; border: 1px solid #000; padding: 8px 4px; text-align: left; min-width: 150px;">Nama Lengkap</th>
                             ${kompList.map(k => `
-                                <th style="background:#f1f5f9; border: 1px solid #000; padding: 8px 4px; text-align: center;">
+                                <th style="background:#f1f5f9; border: 1px solid #000; padding: 8px 4px; text-align: center; min-width: 70px; max-width: 120px; word-wrap: break-word;">
                                     ${escapeHtml(k.nama)}
                                 </th>
                             `).join('')}
-                            <th style="background:#e2e8f0; border: 1px solid #000; padding: 8px 4px; text-align: center; width: 70px;">Rata</th>
+                            <th style="background:#e2e8f0; border: 1px solid #000; padding: 8px 4px; text-align: center; width: 60px;">Rata</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1062,7 +1059,7 @@
                             <tr>
                                 <td style="border: 1px solid #000; text-align:center; padding: 6px 4px;">${idx + 1}</td>
                                 <td style="border: 1px solid #000; text-align:center; padding: 6px 4px; font-weight:bold;">${rankMap[sis.id]}</td>
-                                <td style="border: 1px solid #000; padding: 6px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(sis.nama)}</td>`;
+                                <td style="border: 1px solid #000; padding: 6px 4px; white-space: nowrap;">${escapeHtml(sis.nama)}</td>`;
                             
                             let colsHTML = kompList.map(k => {
                                 let v = sis.nilai[k.id];
@@ -1085,32 +1082,57 @@
             </div>
         `;
 
+        // Membuat kanvas raksasa berukuran 30.000px agar tabel sebebas mungkin membentang.
+        let printContainer = document.createElement('div');
+        printContainer.style.position = 'absolute';
+        printContainer.style.left = '0';
+        printContainer.style.top = '0';
+        printContainer.style.zIndex = '-9999';
+        printContainer.style.pointerEvents = 'none';
+        printContainer.style.width = '30000px'; 
+        printContainer.innerHTML = htmlContent;
+        document.body.appendChild(printContainer);
+
+        // Setelah dirender sekejap, kita ukur lebar aktual tabelnya (misal 1500px)
+        let targetElement = printContainer.firstElementChild;
+        let actualWidth = targetElement.offsetWidth;
+        let actualHeight = targetElement.offsetHeight;
+
         let btn = document.getElementById("btnCetakKelas");
         let originalText = btn.innerHTML;
         btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Menyimpan PDF...`;
         btn.disabled = true;
 
-        // KUNCI: Kita buat elemen palsu ini lalu mengirimkannya *langsung* ke html2pdf.
-        // Sama sekali TANPA document.body.appendChild! Dengan ini PDF akan bersih dan tidak dipengaruhi layar HP Anda.
-        let tempDiv = document.createElement('div');
-        tempDiv.innerHTML = htmlContent;
-
+        // Kita suplai ukuran aktual tersebut ke alat pengonversi PDF
         var opt = {
-            margin:       [10, 10, 10, 10], // Margin atas, kiri, bawah, kanan
+            margin:       [5, 5, 5, 5], 
             filename:     `Rekap_Nilai_Kelas_${currentKelas}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true, windowWidth: finalWidth }, 
+            html2canvas:  { 
+                scale: 2, 
+                useCORS: true, 
+                width: actualWidth,         // Jaminan tidak terpotong ke samping
+                height: actualHeight,       // Jaminan tidak terpotong ke bawah
+                windowWidth: actualWidth,
+                windowHeight: actualHeight,
+                scrollX: 0,                 // Jaminan titik nol selalu presisi di kiri (Tidak terpotong di kiri)
+                scrollY: 0,
+                x: 0,
+                y: 0
+            }, 
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
         };
 
-        html2pdf().set(opt).from(tempDiv).save().then(() => {
+        html2pdf().set(opt).from(targetElement).save().then(() => {
             btn.innerHTML = originalText;
             btn.disabled = false;
+            document.body.removeChild(printContainer);
         }).catch(err => {
             console.error(err);
             customAlert("Gagal", "Terjadi kesalahan saat memproses PDF.", "danger");
             btn.innerHTML = originalText;
             btn.disabled = false;
+            if(document.body.contains(printContainer)) document.body.removeChild(printContainer);
         });
     }
 
@@ -1343,14 +1365,15 @@
         updateKelasTarget();
     }
 
-    window.onload = () => {
-        loadAll();
+    // MEMASTIKAN DATA TERMUAT DI DETIK PERTAMA, MENYELESAIKAN MASALAH DROPDOWN KOSONG
+    document.addEventListener("DOMContentLoaded", () => {
+        loadAll(); 
         if(sessionStorage.getItem("logged") === "true") {
             currentRole = sessionStorage.getItem("role");
             currentAdminName = sessionStorage.getItem("adminName");
             proceedLogin();
         }
-    };
+    });
 </script>
 
 </body>
